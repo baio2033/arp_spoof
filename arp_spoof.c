@@ -216,12 +216,12 @@ void *sniff_packet(void *data){
 
 			
 			if(ntohs(recv_ether->ether_type) != ETHERTYPE_IP) {
-				printf("recv_ether->ether_type : %x\n",ntohs(recv_ether->ether_type));
+				//printf("recv_ether->ether_type : %x\n",ntohs(recv_ether->ether_type));
 				continue;
 			}
 			recv_iphdr = (struct iphdr *)(packet+sizeof(struct etherhdr));
 			if(recv_iphdr->ip_p != 1) {
-				printf("%d\n",recv_iphdr->ip_p);
+				//printf("%d\n",recv_iphdr->ip_p);
 				continue;
 			}
 			else{
@@ -240,8 +240,9 @@ void *sniff_packet(void *data){
 					memcpy(&(send_iphdr->ip_dst.s_addr),senderIP,4);
 					//memcpy(send_iphdr->ip_dst.s_addr,senderIP,4);
 					send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
-					printf("icmp type : %d\n",send_icmp->type);
+					//printf("icmp type : %d\n",send_icmp->type);
 					memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
+					memcpy(&(send_icmp->checksum),"\x54",1);
 					printf("\n[*] send packet dump\n");
 					packet_dump(send_packet,74);
 					printf("end\n");
@@ -250,7 +251,7 @@ void *sniff_packet(void *data){
 					printf("surce IP : %x\n",htonl(send_iphdr->ip_src.s_addr));
 					printf("destination IP : %x\n",htonl(send_iphdr->ip_dst.s_addr));
 					printf("ICMP type : %x\n",send_icmp->type);
-
+					printf("ICMP checksum : %x\n",htons(send_icmp->checksum));
 					while(1){
 						if(pcap_sendpacket(handle,send_packet,74) == 0)
 							break;
