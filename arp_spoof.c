@@ -242,7 +242,8 @@ void *sniff_packet(void *data){
 					send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
 					//printf("icmp type : %d\n",send_icmp->type);
 					memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
-					memcpy(&(send_icmp->checksum),"\x54",1);
+					//printf("checksum : %x , %x\n",htons(send_icmp->checksum),htons(send_icmp->checksum+8));
+					send_icmp->checksum += 8;
 					printf("\n[*] send packet dump\n");
 					packet_dump(send_packet,74);
 					printf("end\n");
