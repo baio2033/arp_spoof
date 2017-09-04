@@ -86,6 +86,7 @@ struct __attribute__((packed)) argu_list{
 	u_char *sender_mac;
 	struct in_addr *senderIP;
 	struct in_addr *targetIP;
+    struct in_addr *myIP;
 };
 
 typedef struct __attribute__((packed)) _argu{
@@ -94,6 +95,8 @@ typedef struct __attribute__((packed)) _argu{
     u_char *sender_mac;
     struct in_addr *targetIP;
     u_char *target_mac;
+    struct in_addr *myIP;
+    u_char *gateway_mac;
 }argu_group;
 
 u_char* GetSvrMacAddress(char* dev_name)
