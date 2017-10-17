@@ -80,23 +80,16 @@ struct __attribute__((packed)) icmphdr{
   } un;
 };
 
-struct __attribute__((packed)) argu_list{
-	pcap_t *handle;
-	u_char *my_mac;
-	u_char *sender_mac;
-	struct in_addr *senderIP;
-	struct in_addr *targetIP;
-    struct in_addr *myIP;
-};
-
 typedef struct __attribute__((packed)) _argu{
     pcap_t *handle;
+    u_char* dev;
+    int interval;
     struct in_addr *senderIP;
     u_char *sender_mac;
     struct in_addr *targetIP;
     u_char *target_mac;
     struct in_addr *myIP;
-    u_char *gateway_mac;
+    u_char *my_mac;
 }argu_group;
 
 u_char* GetSvrMacAddress(char* dev_name)
