@@ -6,5 +6,5 @@ BoB 6th Digital Forensic Track
 
 network > arp spoofing 
 
-[*] Usage : make; ./arp_spoof [interface] [sender IP] [target IP]
+[*] Usage : make; ./arp_spoof [interface] [sender IP1] [target IP1] [sender IP2] [target IP2] ... 
 
