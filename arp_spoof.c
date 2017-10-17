@@ -116,30 +116,13 @@ u_char* arp_broad(pcap_t *handle, u_char *src_mac, u_char *dst_mac, struct in_ad
 
 	pcap_set_timeout(handle, 3000);
 	make_etherhdr(&ether,src_mac,dst_mac);
-	/*printf("\n[+] information of packet to send\n\n");
-	printf("\t[-] destination MAC : "); print_mac(dst_mac);
-	printf("\t[-] source MAC : "); print_mac(src_mac);
-	printf("\t[-] ethernet type : 0x%x\n",ntohs(ether.ether_type));*/
 
 	make_arphdr(&arp,src_mac,"\x00\x00\x00\x00\x00\x00",senderIP,targetIP,option);
-	// printf("sender IP : %s\n",inet_ntoa(*senderIP));
-	// printf("target IP : %s\n",inet_ntoa(*targetIP));
-	// printf("target IP : %s\n",inet_ntoa(*targetIP));
-	/*&printf("\n\t[-] sneder MAC : "); print_mac(arp.sha);
-	printf("\t[-[ sender IP : 0x"); for(int i=0;i<4;i++) printf("%02X",arp.spa[i]); printf("\n");
-	printf("\t[-] target MAC : "); print_mac(arp.tha);
-	printf("\t[-] target IP : 0x"); for(int i=0;i<4;i++) printf("%02X",arp.tpa[i]); printf("\n");*/
-
-	//arp_packet_info(&ether, &arp);
 
 	packet_len = sizeof(ether)+sizeof(arp);
 	packet = (u_char*)malloc(packet_len);
 	memcpy(packet,&ether,sizeof(ether));
 	memcpy(packet+sizeof(ether),&arp,sizeof(arp));
-
-	// printf("\n[-] send packet dump\n");
-	// packet_dump(packet,packet_len);
-	// printf("end\n\n");
 
 	while(1){
 		if(pcap_sendpacket(handle,packet,packet_len) == 0)
@@ -215,25 +198,14 @@ void arp_infect(pcap_t *handle, u_char *my_mac, u_char *sender_mac, struct in_ad
 	make_etherhdr(&ether,my_mac,sender_mac);
 	make_arphdr(&arp_h,my_mac,sender_mac,targetIP,senderIP,option);
 
-	//printf("arp_infection senderIP : %s\n",inet_ntoa(*senderIP));
-	//arp_packet_info(&ether, &arp_h);
-
 	packet = (u_char*)malloc(sizeof(ether)+sizeof(arp_h));
 	memcpy(packet,&ether,sizeof(ether));
 	memcpy(packet+sizeof(ether),&arp_h,sizeof(arp_h));
 	packet_len = sizeof(ether) + sizeof(arp_h);
-
-/*
-	printf("\n[+] packet to send(packet length : %d \n",packet_len);
-	packet_dump(packet,packet_len);
-	printf("end\n\n");
-*/
 	while(1){
 		if(pcap_sendpacket(handle,packet,packet_len) == 0)
 			break;
 	}
-
-	//printf("\n[+] arp infection completed!\n\n");
 }
 
 void *infection(void *data){
@@ -245,12 +217,6 @@ void *infection(void *data){
 	struct in_addr *targetIP = argu->targetIP;
 	u_char *my_mac = argu->my_mac;
 
-	//printf("infection function senderIP : %s\n",inet_ntoa(*senderIP));
-/*
-	print_mac(sender_mac);
-	print_mac(target_mac);
-	printf("%x\n%x\n",htonl(senderIP->s_addr),htonl(targetIP->s_addr));
-*/
 	while(1){
 		//printf("while loop\n");
 		arp_infect(handle, my_mac, sender_mac, senderIP, targetIP);
@@ -333,64 +299,6 @@ void *sniff_packet(void *data){
 			free(send_packet);
 
 		}
-		/*else{
-			//printf("[+] packet sniffing success!\n");
-			recv_ether = (struct etherhdr *)packet;
-			
-			if(strcmp(recv_ether->src,target_mac)) continue;
-
-			if(ntohs(recv_ether->ether_type) == ETH_ARP){
-
-			}
-			else if(ntohs(recv_ether->ether_type) != ETHERTYPE_IP) {
-				//printf("recv_ether->ether_type : %x\n",ntohs(recv_ether->ether_type));
-				continue;
-			}
-			recv_iphdr = (struct iphdr *)(packet+sizeof(struct etherhdr));
-			if(recv_iphdr->ip_p != 1) {
-				//printf("%d\n",recv_iphdr->ip_p);
-				continue;
-			}
-			else{
-				//ping_addr = (struct in_addr *)malloc(sizeof(struct in_addr));
-				//ping_addr = recv_iphdr->ip_dst;
-				//printf("ip protocol is ICMP\n");
-				if(packet[34] == 0) continue;
-				else{
-					send_packet = (u_char *)malloc(74);
-					memcpy(send_packet,packet,74);
-					send_ether = (struct etherhdr *)(send_packet);
-					send_iphdr = (struct iphdr *)(send_packet+sizeof(struct etherhdr));
-					memcpy(send_ether->dst,target_mac,6);
-					memcpy(send_ether->src,sender_mac,6);
-					//memcpy(&(send_iphdr->ip_src.s_addr),send_packet+30,4);
-					memcpy(&(send_iphdr->ip_src.s_addr),senderIP,4);
-					//send_icmp = (struct icmphdr *)(send_packet+sizeof(struct etherhdr)+sizeof(struct iphdr));
-					//printf("icmp type : %d\n",send_icmp->type);
-					//memcpy(&(send_icmp->type),"\x00",sizeof(send_icmp->type));
-					//printf("checksum : %x , %x\n",htons(send_icmp->checksum),htons(send_icmp->checksum+8));
-					//send_icmp->checksum += 8;
-					printf("\n[*] send packet dump\n");
-					packet_dump(send_packet,74);
-					printf("end\n");
-					printf("destination mac : "); print_mac(send_ether->dst);
-					printf("source mac : "); print_mac(send_ether->src);
-					printf("target mac : "); print_mac(target_mac);
-					printf("source IP : %x\n",htonl(send_iphdr->ip_src.s_addr));
-					printf("destination IP : %x\n",htonl(send_iphdr->ip_dst.s_addr));
-					//printf("ICMP type : %x\n",send_icmp->type);
-					//printf("ICMP checksum : %x\n",htons(send_icmp->checksum));
-					while(1){
-						if(pcap_sendpacket(handle,send_packet,74) == 0){
-							printf("send success\n");
-							break;
-						}
-					}
-
-					free(send_packet);
-				}
-			}
-		}*/
 	}
 }
 
